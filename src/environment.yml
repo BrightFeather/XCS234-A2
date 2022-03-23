@@ -8,7 +8,7 @@ dependencies:
   - notebook=6.4.0
   - tk>=8.6.8
   - matplotlib=3.3.4
-  - numpy=1.20.1
+  - numpy
   - scipy=1.6.2
   - gym=0.18.0
   - tensorboard=2.5.0
