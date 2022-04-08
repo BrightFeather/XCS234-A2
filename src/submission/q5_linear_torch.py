@@ -7,6 +7,7 @@ from utils.general import join
 from core.deep_q_learning_torch import DQN
 from .q3_schedule import LinearExploration, LinearSchedule
 
+import os
 import yaml
 yaml.add_constructor('!join', join)
 
@@ -54,6 +55,9 @@ class Linear(DQN):
         img_height, img_width, n_channels = state_shape
         num_actions = self.env.action_space.n
         ### START CODE HERE ###
+        input_size = img_height * img_width * n_channels * self.config["hyper_params"]["state_history"]
+        self.q_network = nn.Linear(input_size, num_actions)
+        self.target_network = nn.Linear(input_size, num_actions)
         ### END CODE HERE ###
 
     ############################################################
@@ -84,6 +88,12 @@ class Linear(DQN):
         out = None
 
         ### START CODE HERE ###
+        flattened_input = torch.flatten(state, start_dim = 1)
+        assert network in ["q_network", "target_network"], "Invalid network name"
+        if network == 'q_network':
+            out = self.q_network(flattened_input)
+        else:
+            out = self.target_network(flattened_input)
         ### END CODE HERE ###
 
         return out
@@ -106,6 +116,10 @@ class Linear(DQN):
         """
 
         ### START CODE HERE ###
+        dir = os.path.abspath('.')
+        PATH = os.path.join(dir, 'network.pkl')
+        torch.save(self.q_network.state_dict(), PATH)
+        self.target_network.load_state_dict(torch.load(PATH))
         ### END CODE HERE ###
 
     ############################################################
@@ -153,6 +167,19 @@ class Linear(DQN):
         num_actions = self.env.action_space.n
         gamma =  self.config["hyper_params"]["gamma"]
         ### START CODE HERE ###
+        max_target_q_value, _ = torch.max(target_q_values, 1)
+        q_samp = rewards + gamma * torch.mul(max_target_q_value, (~done_mask).float())
+        # print(max_target_q_value)
+        # print(~done_mask)
+        # print(torch.mul(max_target_q_value, (~done_mask).float()))
+        one_hot_action = F.one_hot(actions.to(torch.int64), num_classes = num_actions)
+        q_values_on_action = torch.sum(torch.mul(q_values, one_hot_action), 1)
+        # print(q_values_on_action)
+        # print(q_values)
+        # print(one_hot_action)
+        loss = nn.MSELoss()
+        output = loss(q_samp, q_values_on_action)
+        return output
         ### END CODE HERE ###
 
     ############################################################
@@ -171,4 +198,5 @@ class Linear(DQN):
             What are the input to the optimizer's constructor?
         """
         ### START CODE HERE ###
+        self.optimizer = torch.optim.Adam(self.q_network.parameters(), lr=1e-1)
         ### END CODE HERE ###

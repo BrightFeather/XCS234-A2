@@ -6,6 +6,7 @@ from utils.general import get_logger, join
 from utils.test_env import EnvTest
 from .q3_schedule import LinearExploration, LinearSchedule
 from .q5_linear_torch import Linear
+import copy
 
 import yaml
 yaml.add_constructor('!join', join)
@@ -58,6 +59,21 @@ class NatureQN(Linear):
         img_height, img_width, n_channels = state_shape
         num_actions = self.env.action_space.n
         ### START CODE HERE ###
+        # input_size = img_height * img_width * n_channels * self.config["hyper_params"]["state_history"]
+        input_channels = n_channels * self.config["hyper_params"]["state_history"]
+        self.q_network = nn.Sequential(
+            nn.Conv2d(input_channels, 32, 8, stride = 4, padding = 2),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 4, stride = 2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, stride = 1),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(3136, 512), # 7 * 7 * 64
+            nn.ReLU(),
+            nn.Linear(512, num_actions)
+        )
+        self.target_network = copy.deepcopy(self.q_network)
         ### END CODE HERE ###
 
     ############################################################
@@ -88,6 +104,12 @@ class NatureQN(Linear):
         out = None
 
         ### START CODE HERE ###
+        assert network in ["q_network", "target_network"], "Incorrect network name"
+        permuted_state = torch.permute(state, (0, 3, 1, 2))
+        if network == "q_network":
+            out = self.q_network(permuted_state)
+        else:
+            out = self.target_network(permuted_state)
         ### END CODE HERE ###
 
         return out
